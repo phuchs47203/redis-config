@@ -1,0 +1,83 @@
+#download the newest  master-slave file config at link: https://redis.io/docs/management/config/
+#download the newest sentinel file config  at link: https://download.redis.io/redis-stable/sentinel.conf
+
+#create service slave and master replication
+version: "3"
+services:
+  redis-master:
+    container_name: "redis-master"
+    image: redis
+    ports:
+      - "6379:6379"
+    command: "redis-server /etc/redis.conf"
+    volumes:
+      - "./data/master:/data/"
+      - "./master.conf:/etc/redis.conf"
+
+  redis-slave:
+    container_name: "redis-slave"
+    image: redis
+    ports:
+      - "6380:6379"
+    command: "redis-server /etc/redis.conf"
+    volumes:
+      - "./data/slave:/data/"
+      - "./slave.conf:/etc/redis.conf"
+    depends_on:
+      - redis-master
+
+  #create service sentinel
+  redis-sentinel:
+    container_name: "redis-sentinel"
+    image: redis
+    ports:
+      - "26379:26379"
+    command: "redis-server /etc/sentinel.conf --sentinel"
+    volumes:
+      - "./sentinel.conf:/etc/sentinel.conf"
+    depends_on:
+      - redis-master
+      - redis-slave
+
+  #create service cluster
+  redis:
+    image: redis:latest
+    container_name: r4
+    command: bash -c "redis-server --port 6379 --protected-mode no --cluster-enabled yes --appendonly yes --cluster-node-timeout 5000 --cluster-config-file nodes.conf"
+    ports:
+      - "6379:6379"
+    networks:
+      - redisnet
+    volumes:
+      - ./redis:/data
+    depends_on:
+      - redis1
+      - redis2
+
+  redis1:
+    image: redis:latest
+    container_name: r5
+    command: bash -c "redis-server --port 6380 --protected-mode no --cluster-enabled yes --appendonly yes --cluster-node-timeout 5000 --cluster-config-file nodes.conf"
+    ports:
+      - "6380:6380"
+    networks:
+      - redisnet
+    volumes:
+      - ./redis-1:/data
+    depends_on:
+      - redis2
+
+  redis2:
+    image: redis:latest
+    container_name: r6
+    command: bash -c "redis-server --port 6381 --protected-mode no --cluster-enabled yes --appendonly yes --cluster-node-timeout 5000 --cluster-config-file nodes.conf"
+    ports:
+      - "6381:6381"
+    networks:
+      - redisnet
+    volumes:
+      - ./redis-2:/data
+
+networks:
+  redisnet:
+    driver: bridge
